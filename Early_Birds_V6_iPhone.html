@@ -1,0 +1,518 @@
+<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta charset="utf-8"><title>Early Birds · Version 6</title><style>body{font:16px -apple-system,sans-serif;background:#eef4ef;margin:0;color:#173a29}header{background:#164b34;color:white;padding:20px}main{padding:12px;max-width:600px;margin:auto}.card{background:white;border-radius:14px;padding:15px;margin:12px 0}button{background:#176a48;color:white;border:0;border-radius:9px;padding:12px;margin:4px}input{font:inherit;padding:7px;width:55px}input[type=checkbox]{width:auto}h2{margin:0 0 10px}small{color:#65796b}.line{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ddd;padding:10px 0}select{font:inherit;padding:8px}#hole{font-size:24px;font-weight:bold}
+.quarters-table{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:8px 5px;border-bottom:1px solid #dce6de}
+th:first-child{text-align:left}
+#quarters-status{color:#52695b}
+#payments{padding-left:22px}
+#payments li{padding:5px 0}
+
+.provisional{position:sticky;top:0;z-index:2;background:#a51822;color:#fff;padding:12px;border-radius:9px;font-weight:700}
+.rabbit-entrants{display:flex;flex-wrap:wrap;gap:8px 16px;margin:12px 0}
+#rabbit-history{padding-left:24px}
+#rabbit-history li{margin:5px 0}
+
+*{box-sizing:border-box}
+main{padding-bottom:max(24px,env(safe-area-inset-bottom));padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+button,input,select{font-size:16px}
+button,select,input:not([type=checkbox]){min-height:44px}
+button{touch-action:manipulation;font-weight:650}
+button:disabled{opacity:.45}
+.provisional{top:env(safe-area-inset-top,0px);margin:8px 0}
+#storage-notice{background:#fff0cb;color:#522d00;padding:10px;border-radius:9px}
+.setup summary{font-size:1.2rem;font-weight:700;padding:10px 0;cursor:pointer}
+.setup .line{gap:8px;flex-wrap:wrap}
+.setup .line label:first-child{min-width:105px}
+.hole-nav{display:grid;grid-template-columns:1fr minmax(86px,auto) 1fr;gap:6px;align-items:center}
+.hole-nav button{margin:0;min-height:50px}
+.hole-nav select{width:100%}
+#hole{font-size:1.15rem;margin:12px 0 4px}
+.score-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:10px 0;border-bottom:1px solid #ddd}
+.score-person small{display:block;line-height:1.45}
+.score-control{display:flex;align-items:center;gap:4px}
+.score-control button{width:48px;height:48px;margin:0;padding:0;font-size:1.45rem}
+.score-control input{width:48px;height:48px;text-align:center;padding:4px;font-size:1.1rem}
+.score-events{grid-column:1/-1;display:flex;gap:14px}
+.score-events label,.rabbit-entrants label,.setup .line label:first-child{display:inline-flex;gap:5px;align-items:center;min-height:44px}
+input[type=checkbox]{accent-color:#176a48}
+#bottom-navigation{margin-top:12px}
+@media(max-width:360px){.score-row{column-gap:5px}.score-control button,.score-control input{width:44px}.hole-nav{gap:4px}.hole-nav button{padding:8px}}
+</style></head><body><header><h1>⛳ Early Birds</h1>Version 6 · Quarters &amp; Rabbit<br>In memory of Ed Crites</header><main><p id="provisional" class="provisional" role="status" hidden></p>
+<p id="storage-notice" role="status" hidden>Local saving is unavailable in this browser. Back up the round before closing the scorecard.</p>
+<details class="card setup">
+  <summary>Round setup</summary>
+  <label>Date <input type="date" id="date" style="width:150px"></label>
+  <p>Choose golfers and enter their current progs. Group A/B identifies the two groups.</p>
+  <div id="roster"></div>
+</details>
+<section class="card" aria-labelledby="hole">
+  <nav class="hole-nav" aria-label="Choose a hole">
+    <button id="previous" type="button" onclick="move(-1)">‹ Previous</button>
+    <select id="hole-picker" aria-label="Jump to hole" onchange="goToHole(Number(this.value))"></select>
+    <button id="next" type="button" onclick="move(1)">Next ›</button>
+  </nav>
+  <h2 id="hole" aria-live="polite"></h2>
+  <div id="scores"></div>
+  <p><small>Tap + to start at par or type a gross score. Sandies and Greenies require gross par or better. Greenies are available on par 3s.</small></p>
+  <p id="result"></p>
+  <nav id="bottom-navigation" class="hole-nav" aria-label="Continue to another hole">
+    <button id="previous-bottom" type="button" onclick="move(-1)">‹ Previous</button>
+    <span></span>
+    <button id="next-bottom" type="button" onclick="move(1)">Next ›</button>
+  </nav>
+</section>
+
+<section class="card" aria-labelledby="quarters-title">
+  <h2 id="quarters-title">Quarters accounting</h2>
+  <p id="quarters-status" aria-live="polite"></p>
+  <div class="quarters-table"><table>
+    <caption>Skins by category</caption>
+    <thead><tr><th scope="col">Golfer</th><th scope="col">Net</th><th scope="col">Birdie+</th><th scope="col">Sandies</th><th scope="col">Greenies</th><th scope="col">Total</th><th scope="col">Net cash</th></tr></thead>
+    <tbody id="quarters-totals"></tbody>
+  </table></div>
+  <h3>Who pays whom</h3>
+  <p id="payments-empty"></p>
+  <ul id="payments"></ul>
+</section>
+
+<section class="card" aria-labelledby="rabbit-title">
+  <h2 id="rabbit-title">Rabbit</h2>
+  <p>Optional, usually on Mondays and Fridays. Select entrants for the $5 game.</p>
+  <label for="rabbit-method">Rabbit scoring method</label>
+  <select id="rabbit-method" style="display:block;max-width:100%;margin:8px 0" onchange="setRabbitMethod(this.value)">
+    <option value="gross">Gross Rabbit</option>
+    <option value="net">Net Rabbit (Prog Handicap)</option>
+  </select>
+  <div id="rabbit-entrants" class="rabbit-entrants"></div>
+  <p id="rabbit-status" aria-live="polite"></p>
+  <p id="rabbit-payout"></p>
+  <details id="rabbit-detail" hidden>
+    <summary>Rabbit hole history</summary>
+    <ol id="rabbit-history"></ol>
+  </details>
+</section>
+<section class="card" aria-labelledby="prog-title">
+  <h2 id="prog-title">Prog Summary</h2>
+  <p id="prog-status" aria-live="polite"></p>
+  <div class="quarters-table"><table>
+    <thead><tr><th scope="col">Golfer</th><th scope="col">Starting prog</th><th scope="col">Points</th><th scope="col">Difference</th><th scope="col">Adjustment</th><th scope="col">Next prog</th></tr></thead>
+    <tbody id="prog-totals"></tbody>
+  </table></div>
+</section>
+<div class="card"><h2>Review & backup</h2><div id="totals"></div><button onclick="exportCSV()">Export CSV</button><button onclick="backup()">Backup round</button>
+<button type="button" onclick="document.getElementById('restore-file').click()">Restore Backup</button>
+<input id="restore-file" type="file" accept=".json,application/json" hidden>
+<p id="restore-status" role="status" hidden></p><button onclick="reset()">New round</button><p><small>Scores save automatically on this device, not to iCloud. Export CSV to transfer data to Numbers.</small></p></div></main><script>
+const par=[5,4,4,3,4,4,3,4,5,4,5,3,4,4,5,3,4,4],hcp=[5,3,13,17,1,9,11,15,7,18,6,14,12,10,4,16,2,8],names=['George','Terry','Mike','Kai','Alan','Georgie','Guest 1','Guest 2'];const storageKey='earlybirds-v6-iphone';
+let d;
+let storageAvailable=true;
+try {
+  d=JSON.parse(localStorage.getItem(storageKey));
+} catch {
+  storageAvailable=false;
+}
+if (!d) {
+  d={hole:0,date:new Date().toLocaleDateString('en-CA'),
+    players:names.map((name,i)=>({name,prog:[28,18,25,19,25,20,20,20][i],playing:i<5,group:i<4?'A':'B'})),
+    scores:{},events:{},rabbitEntrants:[],rabbitMethod:'gross'};
+}
+if (!['gross','net'].includes(d.rabbitMethod)) d.rabbitMethod='gross';
+function save() {
+  try {
+    localStorage.setItem(storageKey,JSON.stringify(d));
+    storageAvailable=true;
+  } catch {
+    storageAvailable=false;
+  }
+  document.getElementById('storage-notice').hidden=storageAvailable;
+}
+function active(){return d.players.filter(p=>p.playing)}function stroke(p,h){let diff=Math.max(0,Math.max(...active().map(x=>x.prog))-p.prog);return Math.floor(diff/18)+(hcp[h]<=diff%18?1:0)}
+function gross(player, hole) {
+  const score = d.scores[player.name + '-' + hole];
+  return Number.isInteger(score) && score > 0 ? score : null;
+}
+
+function eligible(player, hole, kind) {
+  const score = gross(player, hole);
+  return score !== null && score <= par[hole] && (kind === 's' || par[hole] === 3);
+}
+
+function awarded(player, hole, kind) {
+  return eligible(player, hole, kind) && Boolean(d.events[player.name + '-' + hole + '-' + kind]);
+}
+
+function setEvent(name, hole, kind, checked) {
+  const player = active().find(p => p.name === name);
+  d.events[name + '-' + hole + '-' + kind] = checked && eligible(player, hole, kind);
+  save();
+  renderQuarters();
+}
+
+function setGross(name, hole, value) {
+  const player = active().find(p => p.name === name);
+  const key = name + '-' + hole;
+  const score = Number(value);
+  if (Number.isInteger(score) && score > 0) d.scores[key] = score;
+  else delete d.scores[key];
+  for (const kind of ['s', 'g']) {
+    if (!eligible(player, hole, kind)) delete d.events[key + '-' + kind];
+  }
+  save();
+  render();
+}
+
+// Score by gross strokes relative to par. Scores better than eagle need a manual decision.
+function holePoints(score, hole) {
+  if (score === null) return null;
+  const relative = score - par[hole];
+  if (relative >= 2) return 0;
+  return {1:1, 0:2, '-1':4, '-2':6}[relative] ?? null;
+}
+
+function progAdjustment(difference) {
+  if (difference <= -4) return -1;
+  if (difference <= 3) return 0;
+  if (difference === 4) return 1;
+  if (difference <= 10) return Math.floor((difference - 1) / 2);
+  return null;
+}
+
+function progSummary(players) {
+  const complete = roundProgress(players) === 18;
+  return players.map(player => {
+    const scores = par.map((_,hole) => gross(player,hole));
+    const unlisted = scores.some((score,hole) => score !== null && holePoints(score,hole) === null);
+    const points = scores.reduce((sum,score,hole) => sum + (holePoints(score,hole) ?? 0),0);
+    const starting = player.prog;
+    const validStarting = Number.isInteger(starting);
+    const difference = !unlisted && validStarting ? points - starting : null;
+    const adjustment = complete && difference !== null ? progAdjustment(difference) : null;
+    return {name:player.name, starting, points:unlisted ? null : points, difference, adjustment,
+      next:adjustment === null ? null : starting + adjustment,
+      review:unlisted ? 'Score better than eagle' : !validStarting ? 'Starting prog must be a whole number' :
+        complete && difference > 10 ? 'Difference above +10' : ''};
+  });
+}
+
+const signed = n => n === null ? '—' : n > 0 ? '+' + n : String(n);
+
+function renderProg(players) {
+  const complete = roundProgress(players) === 18;
+  const rows = progSummary(players);
+  const status = document.getElementById('prog-status');
+  status.textContent = !players.length ? 'Select golfers in Round Setup.' : complete
+    ? 'Starting progs come from Round Setup. Next progs can be carried forward when you start a new round.'
+    : 'Points and differences are provisional. Next progs appear when all 18 holes are scored for every golfer.';
+  document.getElementById('prog-totals').innerHTML = rows.map(row =>
+    `<tr><th scope="row">${row.name}</th><td>${row.starting}</td><td>${row.points ?? '—'}</td><td>${signed(row.difference)}</td><td>${signed(row.adjustment)}</td><td>${row.review ? 'Review: '+row.review : row.next ?? '—'}</td></tr>`
+  ).join('');
+}
+
+function netWinner(players, hole) {
+  if (!players.length || players.some(p => gross(p, hole) === null)) return null;
+  const scores = players.map(p => gross(p, hole) - stroke(p, hole));
+  const low = Math.min(...scores);
+  return scores.indexOf(low) === scores.lastIndexOf(low) ? players[scores.indexOf(low)] : null;
+}
+
+function quarters(players) {
+  const totals = players.map(p => ({name:p.name, net:0, birdies:0, sandies:0, greenies:0, total:0, cents:0}));
+  let complete = 0;
+  for (let hole = 0; hole < 18; hole++) {
+    if (players.length && players.every(p => gross(p, hole) !== null)) complete++;
+    const winner = netWinner(players, hole);
+    players.forEach((p, i) => {
+      const score = gross(p, hole);
+      if (winner === p) totals[i].net++;
+      if (score !== null && score < par[hole]) totals[i].birdies++;
+      if (awarded(p, hole, 's')) totals[i].sandies++;
+      if (awarded(p, hole, 'g')) totals[i].greenies++;
+    });
+  }
+  for (const p of totals) p.total = p.net + p.birdies + p.sandies + p.greenies;
+  const payments = [];
+  for (const payer of totals) {
+    for (const recipient of totals) {
+      if (recipient.total <= payer.total) continue;
+      const cents = (recipient.total - payer.total) * 25;
+      payer.cents -= cents;
+      recipient.cents += cents;
+      payments.push({payer:payer.name, recipient:recipient.name, cents});
+    }
+  }
+  return {totals, payments, complete};
+}
+
+const dollars = cents => (cents < 0 ? '−' : '') + '$' + (Math.abs(cents) / 100).toFixed(2);
+
+function renderQuarters() {
+  const players = active();
+  const {totals, payments, complete} = quarters(players);
+  document.getElementById('quarters-status').textContent = players.length === 0
+    ? 'Select golfers to calculate quarters.'
+    : complete === 18 ? 'Final settlement · 18 holes scored for all golfers.'
+    : 'Provisional settlement · ' + complete + ' of 18 holes scored for all golfers.';
+  document.getElementById('quarters-totals').innerHTML = totals.map(p =>
+    `<tr><th scope="row">${p.name}</th><td>${p.net}</td><td>${p.birdies}</td><td>${p.sandies}</td><td>${p.greenies}</td><td><b>${p.total}</b></td><td>${dollars(p.cents)}</td></tr>`
+  ).join('');
+  document.getElementById('payments-empty').textContent = players.length && !payments.length
+    ? 'No payments to make.' : '';
+  document.getElementById('payments').innerHTML = payments.map(p =>
+    `<li>${p.payer} pays ${p.recipient} <b>${dollars(p.cents)}</b></li>`
+  ).join('');
+}
+
+
+function rabbitMethodLabel(method=d.rabbitMethod) {
+  return method === 'net' ? 'Net Rabbit (Prog Handicap)' : 'Gross Rabbit';
+}
+function setRabbitMethod(method) {
+  const selector = document.getElementById('rabbit-method');
+  if (!['gross','net'].includes(method) || method === d.rabbitMethod) {
+    selector.value = d.rabbitMethod;
+    return;
+  }
+  if (Object.keys(d.scores).length && !confirm('Change to ' + rabbitMethodLabel(method) + '? Rabbit results will be recalculated for all entered holes. Other scoring is unchanged.')) {
+    selector.value = d.rabbitMethod;
+    return;
+  }
+  d.rabbitMethod = method;
+  save();
+  renderRabbit(active(), roundProgress(active()));
+}
+function rabbitRound(entrants) {
+  let holder = null;
+  let legs = 0;
+  const history = [];
+  if (entrants.length < 2) return {holder, legs, history};
+  for (let hole = 0; hole < 18; hole++) {
+    const scores = entrants.map(p => {
+      const score = gross(p, hole);
+      return score === null ? null : score - (d.rabbitMethod === 'net' ? stroke(p, hole) : 0);
+    });
+    if (scores.includes(null)) break;
+    const low = Math.min(...scores);
+    const index = scores.indexOf(low);
+    const winner = index === scores.lastIndexOf(low) ? entrants[index].name : null;
+    let action = 'Tie';
+    if (winner !== null) {
+      if (holder === null) {
+        holder = winner;
+        action = winner + ' captures Rabbit';
+      } else if (winner === holder) {
+        legs++;
+        action = winner + ' adds a leg';
+      } else if (legs > 0) {
+        legs--;
+        action = winner + ' removes a leg from ' + holder;
+      } else {
+        holder = null;
+        action = winner + ' frees Rabbit';
+      }
+    }
+    history.push({holder, legs, action});
+  }
+  return {holder, legs, history};
+}
+
+function setRabbitEntrant(index, checked) {
+  const name = d.players[index].name;
+  d.rabbitEntrants = d.rabbitEntrants.filter(entrant => entrant !== name);
+  if (checked) d.rabbitEntrants.push(name);
+  save();
+  renderRabbit(active(), roundProgress(active()));
+}
+
+function roundProgress(players) {
+  return par.filter((_,hole) => players.length && players.every(p => gross(p,hole) !== null)).length;
+}
+
+function renderRabbit(players, complete) {
+  const entrants = players.filter(p => d.rabbitEntrants.includes(p.name));
+  document.getElementById('rabbit-method').value = d.rabbitMethod;
+  document.querySelector('#rabbit-detail summary').textContent = rabbitMethodLabel() + ' — hole history';
+  document.getElementById('rabbit-entrants').innerHTML = players.map(p =>
+    `<label><input type="checkbox" ${entrants.includes(p)?'checked':''} onchange="setRabbitEntrant(${d.players.indexOf(p)},this.checked)"> ${p.name}</label>`
+  ).join('');
+  const {holder, legs, history} = rabbitRound(entrants);
+  const state = holder === null ? 'Rabbit is free' : holder + ' holds Rabbit (' + legs + (legs === 1 ? ' leg)' : ' legs)');
+  document.getElementById('rabbit-status').textContent = rabbitMethodLabel() + ' · ' + (entrants.length === 0 ? 'Rabbit off.'
+    : entrants.length === 1 ? 'Select at least two entrants to play Rabbit.'
+    : (history.length ? 'Through hole ' + history.length + ': ' + state + '.' : 'Rabbit is free to start.')
+      + (history.length < 18 ? ' Waiting for entrant scores on hole ' + (history.length + 1) + '.' : ''));
+  document.getElementById('rabbit-payout').textContent = history.length < 18 ? ''
+    : complete < 18 ? 'Rabbit payout is provisional until the round is complete.'
+    : holder === null ? 'No winner. No payments or carryover.'
+    : holder + ' wins the ' + dollars(entrants.length * 500) + ' pot, including their own entry. '
+      + entrants.filter(p => p.name !== holder).map(p => p.name + ' pays ' + holder + ' $5.00.').join(' ');
+  document.getElementById('rabbit-detail').hidden = !history.length;
+  document.getElementById('rabbit-history').innerHTML = history.map(h =>
+    `<li>${h.action} · ${h.holder === null ? 'Free' : h.holder + ' (' + h.legs + (h.legs === 1 ? ' leg)' : ' legs)')}</li>`
+  ).join('');
+}
+
+function renderRoundStatus(players) {
+  const count = roundProgress(players);
+  const banner = document.getElementById('provisional');
+  banner.textContent = 'PROVISIONAL — ' + (players.length
+    ? count + ' of 18 holes scored for all golfers.'
+    : 'Select golfers to start the round.');
+  banner.hidden = count === 18;
+  renderRabbit(players, count);
+}
+
+
+function nudgeGross(name,hole,delta) {
+  const player=active().find(p=>p.name===name);
+  const score=gross(player,hole);
+  setGross(name,hole,score===null ? par[hole] : Math.max(1,score+delta));
+  document.getElementById('score-'+(delta>0?'up':'down')+'-'+d.players.indexOf(player))?.focus?.({preventScroll:true});
+}
+const picker=document.getElementById('hole-picker');
+picker.innerHTML=par.map((_,h)=>`<option value="${h}">Hole ${h+1}</option>`).join('');
+
+function render(){document.getElementById('date').value=d.date;document.getElementById('roster').innerHTML=d.players.map((p,i)=>`<div class="line"><label><input type="checkbox" ${p.playing?'checked':''} onchange="d.players[${i}].playing=this.checked;save();render()"> ${p.name}</label><label>Prog <input type="number" value="${p.prog}" onchange="d.players[${i}].prog=+this.value;save();render()"></label><select onchange="d.players[${i}].group=this.value;save()"><option ${p.group==='A'?'selected':''}>A</option><option ${p.group==='B'?'selected':''}>B</option></select></div>`).join('');
+const h=d.hole;
+picker.value=String(h);
+for (const id of ['previous','previous-bottom']) document.getElementById(id).disabled=h===0;
+for (const id of ['next','next-bottom']) document.getElementById(id).disabled=h===17;
+document.getElementById('storage-notice').hidden=storageAvailable;
+document.getElementById('hole').textContent=`Hole ${h+1} of 18 · Par ${par[h]} · HCP ${hcp[h]}`;
+document.getElementById('scores').innerHTML=active().map(p=>{
+  const v=gross(p,h)??'', strokes=stroke(p,h), index=d.players.indexOf(p);
+  return `<div class="score-row">
+    <div class="score-person"><b>${p.name}</b><small>Group ${p.group} · ${strokes} stroke(s) · Net ${v===''?'—':v-strokes}</small></div>
+    <div class="score-control">
+      <button id="score-down-${index}" type="button" aria-label="Decrease ${p.name} gross" ${v===''||v===1?'disabled':''} onclick="nudgeGross('${p.name}',${h},-1)">−</button>
+      <input aria-label="${p.name} gross" type="number" inputmode="numeric" min="1" value="${v}" step="1" placeholder="—" onchange="setGross('${p.name}',${h},this.value)">
+      <button id="score-up-${index}" type="button" aria-label="${v===''?'Set '+p.name+' gross to par':'Increase '+p.name+' gross'}" onclick="nudgeGross('${p.name}',${h},1)">+</button>
+    </div>
+    <div class="score-events">
+      <label><input type="checkbox" ${awarded(p,h,'s')?'checked':''} ${eligible(p,h,'s')?'':'disabled'} onchange="setEvent('${p.name}',${h},'s',this.checked)"> Sandy</label>
+      <label><input type="checkbox" ${awarded(p,h,'g')?'checked':''} ${eligible(p,h,'g')?'':'disabled'} onchange="setEvent('${p.name}',${h},'g',this.checked)"> Greenie</label>
+    </div>
+  </div>`;
+}).join('');
+const ps = active();
+const complete = ps.length && ps.every(p => gross(p,h) !== null);
+const winner = netWinner(ps,h);
+document.getElementById('result').textContent = !complete
+  ? 'Provisional: awaiting all scores'
+  : winner ? 'Net skin: ' + winner.name : 'Tied net hole · no net skin';
+document.getElementById('totals').innerHTML = ps.map(p => {
+  const scores = par.map((_,hole) => gross(p,hole));
+  return `<div class="line">${p.name}<b>${scores.every(v => v !== null) ? scores.reduce((a,b) => a+b,0) : 'Incomplete'}</b></div>`;
+}).join('');
+renderQuarters();
+renderRoundStatus(ps);
+renderProg(ps);
+}
+
+function goToHole(hole) {
+  d.hole=Math.max(0,Math.min(17,hole));
+  save();
+  render();
+}
+function move(n) { goToHole(d.hole+n); }
+document.getElementById('date').onchange=e=>{d.date=e.target.value;save()};function download(name,text,type){let a=document.createElement('a'),url=URL.createObjectURL(new Blob([text],{type}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}function exportCSV(){let rows=[['Date','Player','Group','Prog','Hole','Par','HCP','Strokes','Gross','Net','Sandy','Greenie','Birdie or better']];for(let p of active())for(let h=0;h<18;h++){let v=gross(p,h);rows.push([d.date,p.name,p.group,p.prog,h+1,par[h],hcp[h],stroke(p,h),v??'',v==null?'':v-stroke(p,h),awarded(p,h,'s')?1:0,awarded(p,h,'g')?1:0,v!=null&&v<par[h]?1:0])}download('Early_Birds_'+d.date+'.csv',rows.map(r=>r.join(',')).join('\n'),'text/csv')}function backup(){download('Early_Birds_backup_'+d.date+'.json',JSON.stringify(d,null,2),'application/json')}function validateBackup(value) {
+  const record = item => item !== null && typeof item === 'object' && !Array.isArray(item);
+  if (!record(value)) throw new Error('The backup must contain one Early Birds round.');
+  const {hole,date,players,scores,events,rabbitEntrants=[],rabbitMethod='gross'} = value;
+  if (!['gross','net'].includes(rabbitMethod)) throw new Error('The backup contains an invalid Rabbit scoring method.');
+
+  if (!Number.isInteger(hole) || hole < 0 || hole >= par.length) {
+    throw new Error('The saved hole must be between 1 and 18.');
+  }
+  if (date !== '') {
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('The backup date must use YYYY-MM-DD.');
+    }
+    const parsed = new Date(date + 'T00:00:00Z');
+    if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0,10) !== date) {
+      throw new Error('The backup date is not a valid calendar date.');
+    }
+  }
+
+  if (!Array.isArray(players) || !players.length || players.length > names.length ||
+      players.some(p => !record(p) || !names.includes(p.name) || !Number.isFinite(p.prog) ||
+        typeof p.playing !== 'boolean' || !['A','B'].includes(p.group))) {
+    throw new Error('The backup contains invalid golfer, prog, or group information.');
+  }
+  const golferNames = new Set(players.map(p => p.name));
+  if (golferNames.size !== players.length) throw new Error('The backup lists a golfer more than once.');
+
+  const scoreKeys = new Set(players.flatMap(p => par.map((_,h) => p.name + '-' + h)));
+  const eventKeys = new Set([...scoreKeys].flatMap(key => [key + '-s', key + '-g']));
+  if (!record(scores) || Object.entries(scores).some(([key,score]) =>
+      !scoreKeys.has(key) || !Number.isSafeInteger(score) || score < 1)) {
+    throw new Error('The backup contains an invalid gross score or score location.');
+  }
+  if (!record(events) || Object.entries(events).some(([key,selected]) =>
+      !eventKeys.has(key) || typeof selected !== 'boolean')) {
+    throw new Error('The backup contains invalid Sandy or Greenie selections.');
+  }
+  if (!Array.isArray(rabbitEntrants) || new Set(rabbitEntrants).size !== rabbitEntrants.length ||
+      rabbitEntrants.some(name => !golferNames.has(name))) {
+    throw new Error('The backup contains invalid Rabbit entrants.');
+  }
+  return {hole,date,players:players.map(({name,prog,playing,group}) => ({name,prog,playing,group})),
+    scores,events,rabbitEntrants,rabbitMethod};
+}
+
+function showRestoreStatus(message) {
+  const status = document.getElementById('restore-status');
+  status.textContent = message;
+  status.hidden = false;
+}
+
+async function restoreBackup(file) {
+  let restored;
+  try {
+    restored = validateBackup(JSON.parse(await file.text()));
+  } catch (error) {
+    const detail = error instanceof SyntaxError ? 'Choose an Early Birds JSON backup.' : error.message;
+    showRestoreStatus('Restore failed. ' + detail + ' Current scores were kept.');
+    return;
+  }
+
+  const golfers = restored.players.filter(p => p.playing).map(p => p.name).join(', ') || 'None selected';
+  const others = restored.players.filter(p => !p.playing).map(p => p.name).join(', ');
+  const preview = 'Backup date: ' + (restored.date || 'No date set') + '\nPlaying: ' + golfers +
+    (others ? '\nOther golfers: ' + others : '') + '\nRabbit: ' + rabbitMethodLabel(restored.rabbitMethod);
+  if (!confirm(preview + '\n\nReplace the current round and scores with this backup?')) {
+    showRestoreStatus('Restore cancelled. Current scores were kept.');
+    return;
+  }
+  d = restored;
+  save();
+  render();
+  showRestoreStatus('Backup restored. To correct the date, open Round setup and edit Date.');
+}
+
+document.getElementById('restore-file').onchange = async event => {
+  const input = event.target;
+  const file = input.files[0];
+  input.value = '';
+  if (file) await restoreBackup(file);
+};
+
+function reset() {
+  const nextProgs = new Map(progSummary(active()).filter(row => row.next !== null).map(row => [row.name,row.next]));
+  const carry = nextProgs.size > 0 && confirm(
+    'Carry the calculated progs into the next round? OK carries them forward. Cancel keeps the current progs. Manual-review progs stay as entered.'
+  );
+  if (!confirm('Back up or export this round first if you want a copy. Clear the scores and start a new round?')) return;
+  if (carry) {
+    for (const player of d.players) {
+      if (nextProgs.has(player.name)) player.prog = nextProgs.get(player.name);
+    }
+  }
+  d.scores={};
+  d.events={};
+  d.rabbitEntrants=[];
+  d.hole=0;
+  d.date=new Date().toLocaleDateString('en-CA');
+  save();
+  render();
+}
+save();render();</script></body></html>
